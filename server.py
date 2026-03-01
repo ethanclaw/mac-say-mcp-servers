@@ -12,6 +12,7 @@ Configuration:
 """
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 import subprocess
 import argparse
 import os
@@ -35,8 +36,12 @@ def load_config(config_path: str | None = None) -> dict[str, Any]:
 # Load config
 config = load_config()
 
-# Create MCP server
-mcp = FastMCP("say-tts")
+# Create MCP server with transport security disabled for localhost/host.docker.internal
+transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=False
+)
+
+mcp = FastMCP("say-tts", transport_security=transport_security)
 
 
 @mcp.tool()
@@ -64,6 +69,7 @@ def say(text: str, voice: str | None = None) -> str:
 async def main(host: str = "0.0.0.0", port: int = 8765):
     import uvicorn
     import asyncio
+    # 使用 streamable_http 模式
     app = mcp.streamable_http_app()
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
