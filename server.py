@@ -17,6 +17,7 @@ import subprocess
 import argparse
 import os
 import yaml
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,13 @@ def load_config(config_path: str | None = None) -> dict[str, Any]:
 # Load config
 config = load_config()
 
+# Get output directory
+output_dir = Path(config.get("say", {}).get("output_dir", "/tmp/say"))
+output_dir.mkdir(parents=True, exist_ok=True)
+
+# Container path (for Docker access)
+container_path = config.get("say", {}).get("container_path", "/root/.nanobot/workspace/media/say")
+
 # Create MCP server with transport security disabled for localhost/host.docker.internal
 transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=False
@@ -45,9 +53,42 @@ mcp = FastMCP("say-tts", transport_security=transport_security)
 
 
 @mcp.tool()
-def say(text: str, voice: str | None = None) -> str:
+def say(text: str, voice: str | None = None, output_format: str = "m4a") -> str:
     """
-    Speak text using Mac's say command. Useful for TTS output.
+    Generate speech audio file using Mac's say command.
+
+    Args:
+        text: Text to speak
+        voice: Optional voice name (e.g., 'Alex', 'Samantha'). If not specified, uses default voice from config.
+        output_format: Output format - 'm4a' (recommended for Telegram), 'wav', 'aiff', 'aac'
+
+    Returns:
+        Path to the generated audio file
+    """
+    # Use default voice from config if not specified
+    if not voice:
+        voice = config.get("say", {}).get("default_voice")
+
+    # Generate unique filename
+    filename = f"{uuid.uuid4()}.{output_format}"
+    output_path = output_dir / filename
+
+    cmd = ["say", "-o", str(output_path)]
+    if voice:
+        cmd.extend(["-v", voice])
+    cmd.append(text)
+
+    subprocess.run(cmd, check=True)
+
+    # Return the container path so nanobot can access it
+    filename = output_path.name
+    return f"{container_path}/{filename}"
+
+
+@mcp.tool()
+def say_play(text: str, voice: str | None = None) -> str:
+    """
+    Speak text directly using Mac's say command (plays immediately).
 
     Args:
         text: Text to speak

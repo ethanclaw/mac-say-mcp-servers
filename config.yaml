@@ -8,3 +8,7 @@ port: 8765
 say:
   # 可用的语音列表，通过 say -v | head -20 查看
   default_voice: null  # null 表示使用系统默认
+  # 输出目录
+  output_dir: "/Users/ethan/.nanobot/workspace/media/say"
+  # Docker容器内的挂载路径（用于返回给nanobot的路径）
+  container_path: "/root/.nanobot/workspace/media/say"
