@@ -1,0 +1,10 @@
+# MCP Server Configuration
+
+# Server settings
+host: "0.0.0.0"
+port: 8765
+
+# say command settings
+say:
+  # 可用的语音列表，通过 say -v | head -20 查看
+  default_voice: null  # null 表示使用系统默认

@@ -1,0 +1,17 @@
+[project]
+name = "mac-say-mcp-servers"
+version = "0.1.0"
+description = "MCP Server for Mac say command (TTS)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+say-mcp = "server:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
