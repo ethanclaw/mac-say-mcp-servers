@@ -11,9 +11,7 @@ Configuration:
     All settings can be configured in config.yaml
 """
 
-from mcp.server import Server
-from mcp.server.streamable_http import StreamableHTTPServer
-from mcp.types import TextContent
+from mcp.server.fastmcp import FastMCP
 import subprocess
 import argparse
 import os
@@ -34,65 +32,43 @@ def load_config(config_path: str | None = None) -> dict[str, Any]:
     return {}
 
 
-app = Server("say-tts")
+# Load config
+config = load_config()
+
+# Create MCP server
+mcp = FastMCP("say-tts")
 
 
-@app.list_tools()
-async def list_tools():
-    return [
-        type(
-            "Tool",
-            (),
-            {
-                "name": "say",
-                "description": "Speak text using Mac's say command. Useful for TTS output.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "text": {
-                            "type": "string",
-                            "description": "Text to speak",
-                        },
-                        "voice": {
-                            "type": "string",
-                            "description": "Optional voice name (e.g., 'Alex', 'Samantha'). If not specified, uses default voice from config.",
-                        },
-                    },
-                    "required": ["text"],
-                },
-            },
-        )()
-    ]
+@mcp.tool()
+def say(text: str, voice: str | None = None) -> str:
+    """
+    Speak text using Mac's say command. Useful for TTS output.
+
+    Args:
+        text: Text to speak
+        voice: Optional voice name (e.g., 'Alex', 'Samantha'). If not specified, uses default voice from config.
+    """
+    # Use default voice from config if not specified
+    if not voice:
+        voice = config.get("say", {}).get("default_voice")
+
+    cmd = ["say"]
+    if voice:
+        cmd.extend(["-v", voice])
+    cmd.append(text)
+
+    subprocess.run(cmd, check=True)
+    return f"Spoken: {text}"
 
 
-@app.call_tool()
-async def call_tool(name: str, arguments: dict, config: dict | None = None):
-    if name == "say":
-        text = arguments.get("text", "")
-        voice = arguments.get("voice")
-
-        # Use default voice from config if not specified
-        if not voice and config:
-            voice = config.get("say", {}).get("default_voice")
-
-        cmd = ["say"]
-        if voice:
-            cmd.extend(["-v", voice])
-        cmd.append(text)
-
-        subprocess.run(cmd, check=True)
-        return [TextContent(type="text", text=f"Spoken: {text}")]
-
-    raise ValueError(f"Unknown tool: {name}")
-
-
-async def main(host: str = "0.0.0.0", port: int = 8765, config: dict | None = None):
-    # Store config in app context for access in call_tool
-    app._config = config or {}
-    server = StreamableHTTPServer(app, host=host, port=port)
+async def main(host: str = "0.0.0.0", port: int = 8765):
+    import uvicorn
+    import asyncio
+    app = mcp.streamable_http_app()
+    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    server = uvicorn.Server(config)
     print(f"MCP say-tts server running on http://{host}:{port}/mcp/")
-    print(f"Config: {app._config}")
-    await server.run()
+    await server.serve()
 
 
 if __name__ == "__main__":
@@ -104,11 +80,12 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, help="Port to bind to (overrides config)")
     args = parser.parse_args()
 
-    # Load config
-    config = load_config(args.config)
+    # Reload config with custom path if specified
+    if args.config:
+        config = load_config(args.config)
 
     # CLI args override config file
     host = args.host or config.get("host", "0.0.0.0")
     port = args.port or config.get("port", 8765)
 
-    asyncio.run(main(host, port, config))
+    asyncio.run(main(host, port))
